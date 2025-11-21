@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class PlayerControler : MonoBehaviour
+public class PlayerController : MonoBehaviour
 {
     // Start is called before the first frame update
     private Vector2 movement;
@@ -12,31 +12,62 @@ public class PlayerControler : MonoBehaviour
 
     private int eyesDirection = 1;
 
+    [Header("References")]
     [SerializeField]
     private Transform eyes = null;
-
     [SerializeField]
-    private Rigidbody2D rb;
+    private Rigidbody2D rb = null;
+    [SerializeField]
+    private Text scoreText = null;
 
-    private Text scoreText;
+    [Header("Movement")]
+    [SerializeField]
+    private float moveSpeed = 180f;
+    [SerializeField]
+    private float snapThreshold = 0.3f;
+
+    [Header("Eyes Offset")]
+    [SerializeField]
+    private Vector2 eyesRight = new Vector2(1.2f, 1f);
+    [SerializeField]
+    private Vector2 eyesLeft = new Vector2(0.8f, 1f);
+    [SerializeField]
+    private Vector2 eyesUp = new Vector2(1f, 1.1f);
+    [SerializeField]
+    private Vector2 eyesDown = new Vector2(1f, 0.8f);
+
+    [Header("Immortality")]
+    [SerializeField]
+    private float blinkDuration = 3f;
+    [SerializeField]
+    private float blinkInterval = 0.05f;
+    [SerializeField]
+    private float teleportDelay = 0.3f;
 
     private WallState[,] maze;
-
     private bool immortal = false;
     private bool killed = false;
+    private SpriteRenderer spriteRenderer;
 
     public void init(WallState[,] m)
     {
         maze = m;
         setRandomPosition();
-        StartCoroutine(Blink(3));
-
+        StartCoroutine(Blink(blinkDuration));
     }
+
     void Awake()
     {
-        scoreText = GameObject.FindGameObjectWithTag("Score").GetComponent<Text>();
+        if (scoreText == null)
+        {
+            Debug.LogError("Score Text is not assigned in the inspector!", this);
+        }
+        spriteRenderer = gameObject.transform.GetChild(0).GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+        {
+             Debug.LogError("SpriteRenderer not found on the first child object!", this);
+        }
     }
-    // Update is called once per frame
 
     void setRandomPosition()
     {
@@ -56,7 +87,7 @@ public class PlayerControler : MonoBehaviour
         {
             movement.x = m.x;
             movement.y = 0;
-            if (Mathf.Abs(transform.position.y - Mathf.Round(transform.position.y)) < 0.3f)
+            if (Mathf.Abs(transform.position.y - Mathf.Round(transform.position.y)) < snapThreshold)
             {
                 transform.position = new Vector3(transform.position.x, Mathf.Round(transform.position.y), transform.position.z);
             }
@@ -65,7 +96,7 @@ public class PlayerControler : MonoBehaviour
         {
             movement.y = m.y;
             movement.x = 0;
-            if (Mathf.Abs(transform.position.x - Mathf.Round(transform.position.x)) < 0.3f)
+            if (Mathf.Abs(transform.position.x - Mathf.Round(transform.position.x)) < snapThreshold)
             {
                 transform.position = new Vector3(Mathf.Round(transform.position.x), transform.position.y, transform.position.z);
             }
@@ -73,23 +104,23 @@ public class PlayerControler : MonoBehaviour
         if (movement.x > 0 && eyesDirection != 1)
         {
             eyesDirection = 1;
-            eyes.localPosition = new Vector2(1.2f, 1f);
+            eyes.localPosition = eyesRight;
 
         }
         if (movement.x < 0 && eyesDirection != 0)
         {
             eyesDirection = 0;
-            eyes.localPosition = new Vector2(0.8f, 1f);
+            eyes.localPosition = eyesLeft;
         }
         if (movement.y > 0 && eyesDirection != 2)
         {
             eyesDirection = 2;
-            eyes.localPosition = new Vector2(1f, 1.1f);
+            eyes.localPosition = eyesUp;
         }
         if (movement.y < 0 && eyesDirection != 3)
         {
             eyesDirection = 3;
-            eyes.localPosition = new Vector2(1f, 0.8f);
+            eyes.localPosition = eyesDown;
         }
     }
 
@@ -97,7 +128,7 @@ public class PlayerControler : MonoBehaviour
     {
         if (!killed)
         {
-            rb.velocity = movement * 180f * Time.deltaTime;
+            rb.velocity = movement * moveSpeed * Time.deltaTime;
         }
     }
     public void Kill()
@@ -105,30 +136,33 @@ public class PlayerControler : MonoBehaviour
         if (!immortal)
         {
             killed = true;
-            movement = new Vector2(0f, 0f);
+            movement = Vector2.zero;
             score = 0;
-            scoreText.text = score.ToString();
-            StartCoroutine(Blink(3));
-            StartCoroutine(Teleport(0.3f));
+            if (scoreText != null) scoreText.text = score.ToString();
+            StartCoroutine(Blink(blinkDuration));
+            StartCoroutine(Teleport(teleportDelay));
         }
     }
 
     public void AddScore()
     {
         score += 1;
-        scoreText.text = score.ToString();
+        if (scoreText != null) scoreText.text = score.ToString();
     }
     IEnumerator Blink(float waitTime)
     {
         immortal = true;
         var endTime = Time.time + waitTime;
-        var renderer = gameObject.transform.GetChild(0).GetComponent<SpriteRenderer>();
-        while (Time.time < endTime)
+        if (spriteRenderer != null)
         {
-            renderer.enabled = false;
-            yield return new WaitForSeconds(0.05f);
-            renderer.enabled = true;
-            yield return new WaitForSeconds(0.05f);
+             while (Time.time < endTime)
+            {
+                spriteRenderer.enabled = false;
+                yield return new WaitForSeconds(blinkInterval);
+                spriteRenderer.enabled = true;
+                yield return new WaitForSeconds(blinkInterval);
+            }
+             spriteRenderer.enabled = true;
         }
         immortal = false;
     }
@@ -140,3 +174,4 @@ public class PlayerControler : MonoBehaviour
     }
 
 }
+

@@ -2,172 +2,165 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class EnemyControler : MonoBehaviour
+public class EnemyController : MonoBehaviour
 {
-    private Vector2 movement = new Vector2(0, 0);
-    [SerializeField]
+    private Vector2 movement = Vector2.zero;
+    [Header("Movement")][SerializeField]
     [Range(0, 500)]
     private float speed = 100f;
 
-    public int score = 0;
+    [Header("References")][SerializeField]
+    private Transform directionPrefab = null;
 
+    [Header("Eyes Offset")][SerializeField]
+    private Vector2 eyesRight = new Vector2(1.2f, 1f);
     [SerializeField]
-    private Transform directionPrefab;
+    private Vector2 eyesLeft = new Vector2(0.7f, 1f);
+    [SerializeField]
+    private Vector2 eyesUp = new Vector2(1f, 1.1f);
+    [SerializeField]
+    private Vector2 eyesDown = new Vector2(1f, 0.8f);
 
-    private Transform dir_marker;
+    [Header("AI")][SerializeField]
+    private float arrivalThreshold = 0.1f;
+    [SerializeField]
+    private float killDistanceThreshold = 0.3f;
 
-    private int eyesDirection = -1;
+    public int score = 0;
 
     [SerializeField]
     private Transform eyes = null;
 
     [SerializeField]
-    private Rigidbody2D rb;
+    private Rigidbody2D rb = null;
     private Vector3 mazePosition;
     private WallState[,] maze;
     public float[,] mazeHeat;
 
-    public void init(WallState[,] m)
+    private int eyesDirection = -1;
+
+    public void Init(WallState[,] m)
     {
         maze = m;
         mazeHeat = new float[maze.GetLength(0), maze.GetLength(1)];
-        //dir_marker = Instantiate(directionPrefab, transform.parent);
-        getRoute();
+        GetRoute();
     }
-    private Vector2 choiseDirection(List<Vector2> posibleDirections)
+
+    private Vector2 ChooseDirection(List<Vector2> possibleDirections)
     {
-        var choise = (int)Mathf.Floor(Random.value * posibleDirections.Count);
-        if (posibleDirections.Count > 1)
+        if (possibleDirections.Count == 0)
         {
-            var inverted = new Vector2(0 - posibleDirections[choise].x, 0 - posibleDirections[choise].y);
-            if (movement != inverted)
-            {
-                return posibleDirections[choise];
-            }
-            else
-            {
-                return choiseDirection(posibleDirections);
-            }
+            return Vector2.zero;
+        }
+
+        if (possibleDirections.Count == 1)
+        {
+             return possibleDirections[0];
+        }
+
+        Vector2 invertedMovement = -movement;
+        List<Vector2> preferredDirections = new List<Vector2>();
+        foreach (var dir in possibleDirections)
+        {
+             if (dir != invertedMovement)
+             {
+                 preferredDirections.Add(dir);
+             }
+        }
+
+        if (preferredDirections.Count > 0)
+        {
+            int choiceIndex = Random.Range(0, preferredDirections.Count);
+            return preferredDirections[choiceIndex];
         }
         else
         {
-            return posibleDirections[choise];
+            int choiceIndex = Random.Range(0, possibleDirections.Count);
+            return possibleDirections[choiceIndex];
         }
-
-
     }
 
-    public void getRoute()
+    public void GetRoute()
     {
         int width = maze.GetLength(0);
         int height = maze.GetLength(1);
-        Vector3 position = getMazePosition(transform.position);
+        Vector3 position = GetMazePosition(transform.position);
         mazePosition = position;
         WallState state = maze[(int)position.x, (int)position.y];
-        var posibleDirections = new List<Vector2>();
-        var old_movement = movement;
+        var possibleDirections = new List<Vector2>();
+        Vector2 oldMovement = movement;
 
         if (!state.HasFlag(WallState.LEFT))
         {
-            posibleDirections.Add(new Vector2(-1, 0));
+            possibleDirections.Add(new Vector2(-1, 0));
         }
         if (!state.HasFlag(WallState.UP))
         {
-            posibleDirections.Add(new Vector2(0, 1));
+            possibleDirections.Add(new Vector2(0, 1));
         }
         if (!state.HasFlag(WallState.RIGHT))
         {
-            posibleDirections.Add(new Vector2(1, 0));
+            possibleDirections.Add(new Vector2(1, 0));
         }
         if (!state.HasFlag(WallState.DOWN))
         {
-            posibleDirections.Add(new Vector2(0, -1));
-        }
-        var debugstring = "";
-        for (int i = 0; i < posibleDirections.Count; ++i)
-        {
-            debugstring = debugstring + ' ' + posibleDirections[i].ToString();
+            possibleDirections.Add(new Vector2(0, -1));
         }
 
+        movement = ChooseDirection(possibleDirections);
 
-        movement = choiseDirection(posibleDirections);
-        //placeMarker(position);
-        if (old_movement != movement)
+        if (oldMovement != movement)
         {
-            transform.position = getRenderPosition(position);
+            transform.position = GetRenderPosition(position);
             if (movement.x > 0 && eyesDirection != 1)
             {
                 eyesDirection = 1;
-                eyes.localPosition = new Vector2(1.2f, 1f);
+                eyes.localPosition = eyesRight;
             }
             if (movement.x < 0 && eyesDirection != 0)
             {
                 eyesDirection = 0;
-                eyes.localPosition = new Vector2(0.7f, 1f);
+                eyes.localPosition = eyesLeft;
             }
             if (movement.y > 0 && eyesDirection != 2)
             {
                 eyesDirection = 2;
-                eyes.localPosition = new Vector2(1f, 1.1f);
+                eyes.localPosition = eyesUp;
             }
             if (movement.y < 0 && eyesDirection != 3)
             {
                 eyesDirection = 3;
-                eyes.localPosition = new Vector2(1f, 0.8f);
+                eyes.localPosition = eyesDown;
             }
         }
-
     }
 
-    private Vector3 getMazePosition(Vector3 position)
+    private Vector3 GetMazePosition(Vector3 worldPosition)
     {
         if (maze != null)
         {
             int width = maze.GetLength(0);
             int height = maze.GetLength(1);
-            return new Vector3(Mathf.Round(position.x + width / 2), Mathf.Round(position.y + height / 2), 0);
+            return new Vector3(Mathf.Round(worldPosition.x + width / 2.0f), Mathf.Round(worldPosition.y + height / 2.0f), 0);
         }
-        return new Vector3(0, 0);
-
+        return Vector3.zero;
     }
-    private Vector3 getRenderPosition(Vector3 position)
+
+    private Vector3 GetRenderPosition(Vector3 mazePos)
     {
         int width = maze.GetLength(0);
         int height = maze.GetLength(1);
-        return new Vector3(-width / 2 + position.x, -height / 2 + position.y, 0);
+        return new Vector3(-width / 2.0f + mazePos.x, -height / 2.0f + mazePos.y, 0);
     }
 
-    void placeMarker(Vector3 position)
-    {
-        dir_marker.position = getRenderPosition(position);
-        var arrow = dir_marker.GetChild(0);
-        if (movement.x > 0)
-        {
-            arrow.rotation = Quaternion.Euler(0, 0, -90);
-        }
-        if (movement.x < 0)
-        {
-            arrow.rotation = Quaternion.Euler(0, 0, 90);
-        }
-        if (movement.y < 0)
-        {
-            arrow.rotation = Quaternion.Euler(0, 0, 180);
-        }
-        if (movement.y > 0)
-        {
-            arrow.rotation = Quaternion.Euler(0, 0, 0);
-        }
-
-    }
     void Update()
     {
-
-        var mp = getMazePosition(transform.position);
-        var rp = getRenderPosition(mp);
+        var mp = GetMazePosition(transform.position);
+        var rp = GetRenderPosition(mp);
         var delta = transform.position - rp;
-        if (Mathf.Abs(delta.x + delta.y) < 0.1f && (mazePosition.x != mp.x || mazePosition.y != mp.y))
+        if (delta.magnitude < arrivalThreshold && (mazePosition.x != mp.x || mazePosition.y != mp.y))
         {
-            getRoute();
+            GetRoute();
         }
     }
 
@@ -175,30 +168,29 @@ public class EnemyControler : MonoBehaviour
     {
         rb.velocity = movement * speed * Time.deltaTime;
     }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.ToString().Contains("Wall"))
+        if (other.CompareTag("Wall"))
         {
             //movement = new Vector2(0, 0);
             //StartCoroutine(wait());
         }
-
     }
+
     private void OnTriggerStay2D(Collider2D other)
     {
-        if (other.ToString().Contains("Player"))
+        if (other.CompareTag("Player"))
         {
             var delta = other.transform.position - transform.position;
-            if (Mathf.Abs(delta.x + delta.y) < 0.3f)
+            if (delta.magnitude < killDistanceThreshold)
             {
-                PlayerControler playerControler = other.GetComponent<PlayerControler>();
-                playerControler.Kill();
+                PlayerController playerController = other.GetComponent<PlayerController>();
+                if (playerController != null)
+                {
+                    playerController.Kill();
+                }
             }
         }
-    }
-    IEnumerator wait()
-    {
-        yield return new WaitForSeconds(Random.value / 2);
-        getRoute();
     }
 }
